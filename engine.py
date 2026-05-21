@@ -387,22 +387,22 @@ def gerar_excel(resultado):
              ("LT (dias)",9),("Est. Segurança",13),("Ponto Pedido",13),("LEC",8),("Est. Máximo",12),
              ("Custo Unit. (R$)",15),("Cons. Anual (R$)",16),("Status",18),("Excesso (un)",11),("Excesso (R$)",13)]
     _hdr(ws2, 1, cols2, DARK)
-    for i, row_data in enumerate(df_param.itertuples(), 2):
-        vu  = row_data.V_Unitario if pd.notna(getattr(row_data,'V_Unitario',np.nan)) else 0
-        und = str(getattr(row_data,'Unidade_y',None) or getattr(row_data,'Unidade_x',None) or getattr(row_data,'Unidade',''))
-        vals = [str(row_data.Produto), row_data.Descricao, und,
-                getattr(row_data,'Classificação',''), row_data.ABC,
-                str(getattr(row_data,'End__Físico','') or ''),
-                row_data.Estoque_Atual, round(row_data.CMM,2), round(row_data.Desvio_Pad,2),
-                row_data.Fator_Z, int(row_data.Lead_Time_dias), int(row_data.ES), int(row_data.PP),
-                int(row_data.LEC), int(row_data.Est_Max), vu, row_data.Valor_Consumo_Anual,
-                row_data.Status, int(row_data.Excesso_Un), row_data.Excesso_R_]
+    for i, (_, rd) in enumerate(df_param.iterrows(), 2):
+        vu  = rd.get('V.Unitario', 0) if pd.notna(rd.get('V.Unitario', np.nan)) else 0
+        und = str(rd.get('Unidade_y') or rd.get('Unidade_x') or rd.get('Unidade',''))
+        vals = [str(rd['Produto']), rd['Descricao'], und,
+                rd.get('Classificação',''), rd['ABC'],
+                str(rd.get('End. Físico','') or ''),
+                rd['Estoque_Atual'], round(rd['CMM'],2), round(rd['Desvio_Pad'],2),
+                rd['Fator_Z'], int(rd['Lead_Time_dias']), int(rd['ES']), int(rd['PP']),
+                int(rd['LEC']), int(rd['Est_Max']), vu, rd['Valor_Consumo_Anual'],
+                rd['Status'], int(rd['Excesso_Un']), rd['Excesso_R$']]
         fmts = [None,None,None,None,None,None,"#,##0.00","#,##0.00","#,##0.00","0.00","#,##0",
                 "#,##0","#,##0","#,##0","#,##0","R$ #,##0.00","R$ #,##0.00",None,"#,##0","R$ #,##0.00"]
-        sf = ST_FILL.get(row_data.Status); fills = [None]*17 + [sf, None, None]
+        sf = ST_FILL.get(rd['Status']); fills = [None]*17 + [sf, None, None]
         _drow(ws2, i, vals, fills=fills, fmts=fmts, centers={3,5,7,8,9,10,11,12,13,14,15,19})
-        ws2.cell(i,5).fill = PatternFill("solid", fgColor=ABC_BG.get(row_data.ABC,"FFFFFF"))
-        ws2.cell(i,5).font = Font(name="Arial",bold=True,size=9,color=ABC_FG.get(row_data.ABC,"000000"))
+        ws2.cell(i,5).fill = PatternFill("solid", fgColor=ABC_BG.get(rd['ABC'],"FFFFFF"))
+        ws2.cell(i,5).font = Font(name="Arial",bold=True,size=9,color=ABC_FG.get(rd['ABC'],"000000"))
     ws2.auto_filter.ref = f"A1:{get_column_letter(len(cols2))}1"
 
     # ── ABA 3: GIRO DIRETO ────────────────────────────────────────────────
