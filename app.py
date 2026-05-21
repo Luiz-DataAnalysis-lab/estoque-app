@@ -304,6 +304,8 @@ if gerar:
                     'custo_pedido': custo_pedido,
                     'taxa_carr': taxa_carr,
                 })
+                excel_bytes = gerar_excel(resultado)
+                st.session_state['excel_bytes'] = excel_bytes.read()
                 st.success("✅ Análise concluída!")
             except Exception as e:
                 st.error(f"Erro ao processar: {e}")
@@ -413,14 +415,15 @@ if 'resultado' in st.session_state:
     st.markdown('<div class="section-title">📥 Baixar Excel Completo</div>', unsafe_allow_html=True)
     st.markdown("O arquivo inclui **10 abas**: Resumo · Parâmetros · Giro Direto · Remessas · Em Poder Terceiros · Excesso · Ruptura · Sem Movimento · Plano de Contagem · Painel Acurácia")
 
-    with st.spinner("Gerando Excel..."):
-        excel_bytes = gerar_excel(resultado)
-
     nome_arquivo = f"Estoque_{date.today().strftime('%Y%m%d')}_{st.session_state['nome'].replace(' ','_').replace('/','_')}.xlsx"
-    st.download_button(
-        label="⬇️ Baixar Excel Completo",
-        data=excel_bytes,
-        file_name=nome_arquivo,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
+
+    if 'excel_bytes' in st.session_state:
+        st.download_button(
+            label="⬇️ Baixar Excel Completo",
+            data=st.session_state['excel_bytes'],
+            file_name=nome_arquivo,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    else:
+        st.info("Clique em 'Gerar Análise Completa' para gerar o Excel.")
