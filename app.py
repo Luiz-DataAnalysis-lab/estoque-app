@@ -505,7 +505,8 @@ with aba_contagem:
     with tab_hist:
         if contados == 0:
             st.info("Nenhuma contagem registrada ainda.")
-        else:
+        
+        if True:
             # Enriquecer contagens com dados dos itens
             itens_idx = {i['codigo']: i for i in itens_raw}
             hist = contagens_df.copy()
