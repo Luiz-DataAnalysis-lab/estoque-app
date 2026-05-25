@@ -1,142 +1,69 @@
 # 📦 Sistema de Gestão de Estoque — Lely Center Carambeí
 
-App web com duas abas: **Análise** (gera Excel) + **Contagem** (registra contagens em tempo real via Google Sheets).
+App web com duas abas: **Análise** (gera Excel) + **Contagem** (registra contagens em tempo real).
+
+**Sem Google Cloud. Sem banco de dados externo. Sem configuração de API.**
 
 ---
 
-## 🚀 Como publicar no Streamlit Cloud
+## 🚀 Como publicar no Streamlit Cloud (5 minutos)
 
 ### Passo 1 — Subir os arquivos no GitHub
 
-No seu repositório `estoque-app`, substitua os arquivos existentes por:
+No repositório `estoque-app`, substitua todos os arquivos pelos do ZIP:
 - `app.py`
 - `engine.py`
-- `sheets.py`
+- `storage.py`
 - `requirements.txt`
 - `README.md`
 
-### Passo 2 — Criar o Google Sheets
+> Apague o `sheets.py` antigo se existir.
 
-1. Acesse **sheets.google.com** e crie uma nova planilha
-2. Nomeie como **"Estoque Lely Carambeí"**
-3. Copie o **ID** da URL: `docs.google.com/spreadsheets/d/`**SEU_ID_AQUI**`/edit`
-4. A planilha vai ter duas abas criadas automaticamente pelo app:
-   - `contagens` — histórico de todas as contagens
-   - `itens` — plano de contagem (preenchido quando você gera a análise)
+### Passo 2 — Deploy
 
-### Passo 3 — Criar a Service Account no Google Cloud
-
-1. Acesse **console.cloud.google.com**
-2. Crie um projeto (ou use um existente)
-3. Ative as APIs:
-   - **Google Sheets API**
-   - **Google Drive API**
-4. Vá em **IAM & Admin → Service Accounts → Create Service Account**
-5. Nome: `estoque-lely`
-6. Clique em **Create and Continue** (sem precisar de roles especiais)
-7. Em **Keys → Add Key → Create new key → JSON** — faça o download do arquivo
-
-### Passo 4 — Compartilhar o Google Sheets com a Service Account
-
-1. Abra o arquivo JSON baixado
-2. Copie o campo `client_email` (ex: `estoque-lely@seu-projeto.iam.gserviceaccount.com`)
-3. No Google Sheets, clique em **Compartilhar** e cole esse e-mail com permissão de **Editor**
-
-### Passo 5 — Configurar os Secrets no Streamlit Cloud
-
-1. No **share.streamlit.io**, vá no seu app → **Settings → Secrets**
-2. Cole exatamente isto (substituindo pelos seus dados):
-
-```toml
-[google_sheets]
-spreadsheet_id = "COLE_SEU_ID_AQUI"
-
-[gcp_service_account]
-type = "service_account"
-project_id = "SEU_PROJETO"
-private_key_id = "..."
-private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
-client_email = "estoque-lely@seu-projeto.iam.gserviceaccount.com"
-client_id = "..."
-auth_uri = "https://accounts.google.com/o/oauth2/auth"
-token_uri = "https://oauth2.googleapis.com/token"
-auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_x509_cert_url = "..."
-```
-
-> ⚠️ Copie os valores **exatamente** do arquivo JSON baixado no Passo 3.
-> O campo `private_key` deve ter os `\n` preservados — copie com cuidado.
-
-### Passo 6 — Fazer o deploy
-
-1. No Streamlit Cloud → **New app → From existing repo**
-2. Selecione `estoque-app` → Branch `main` → Main file: `app.py`
-3. URL: `estoque-lely-center.streamlit.app` (ou o nome que escolher)
-4. **Deploy** — aguarde 2-3 minutos
+1. Acesse **share.streamlit.io**
+2. **New app → From existing repo**
+3. Selecione `estoque-app` → Branch `main` → Main file: `app.py`
+4. **Deploy** — sem nenhum secret ou configuração extra
 
 ---
 
-## 📱 Como usar o app de contagem
+## 📱 Como usar
 
-### Fluxo básico:
+### Análise (uma vez por mês)
+1. Aba **Análise & Relatórios**
+2. Carregue os dois CSVs
+3. Clique **Gerar Análise Completa**
+4. Baixe o Excel — itens ficam disponíveis automaticamente na aba Contagem
 
-1. **Aba Análise** — carregue os CSVs de inventário e movimentações → clique **Gerar Análise Completa**
-   - Isso processa tudo e **sincroniza automaticamente** os 817+ itens com o Google Sheets
-   - Gera o Excel com as 6 abas
-
-2. **Aba Contagem** — abra no celular do almoxarife
-   - **O que Contar Agora**: lista priorizada automaticamente por:
-     - 🔴 Itens abaixo do ponto de pedido (urgente)
-     - ⚠️ Itens acima do estoque máximo
-     - Itens nunca contados
-     - Itens com acurácia ruim na última contagem
-     - Frequência ABC (A=mensal, B=bimestral, C=trimestral)
-   - Clique no item → digite a quantidade → **Salvar**
-   - A acurácia aparece em tempo real antes de salvar
-
-3. **Histórico** — veja todas as contagens, exporte CSV, filtre por classe/status/usuário
-
-### Múltiplos usuários:
-- Cada um acessa o link no próprio celular
-- Seleciona o nome antes de contar
-- As contagens são salvas no Google Sheets e ficam visíveis para todos em ~30 segundos
+### Contagem (almoxarife no celular)
+1. Aba **Contagem de Estoque**
+2. Selecione seu nome
+3. **O que Contar Agora** mostra fila priorizada automaticamente:
+   - 🔴 Abaixo do ponto de pedido
+   - ⚠️ Acima do estoque máximo
+   - Nunca contados
+   - Acurácia ruim na última contagem
+   - Fora do prazo ABC
+4. Toque no item → digite a quantidade → **Salvar**
 
 ---
 
-## 📊 Estrutura do Google Sheets
+## ⚠️ Persistência dos dados
 
-| Aba | Colunas | Atualizado quando |
-|-----|---------|-------------------|
-| `itens` | codigo, descricao, unidade, endereco, abc, frequencia, proxContagem, qtdSistema, custoUnit, status, prioridade | Ao gerar análise |
-| `contagens` | codigo, qtd, usuario, data, observacao | A cada contagem registrada |
-
-Você pode abrir o Google Sheets a qualquer momento para ver ou editar as contagens manualmente.
+Os dados ficam em arquivos JSON no servidor Streamlit Cloud.
+O plano gratuito pode hibernar apps sem uso por 7+ dias e limpar os arquivos.
+**Exporte o CSV regularmente** pela aba Histórico como backup.
 
 ---
 
-## 🔧 Arquivos do projeto
+## 🗂️ Arquivos
 
 ```
 estoque-app/
-├── app.py          ← Interface principal (Análise + Contagem)
-├── engine.py       ← Motor de cálculo (CMM, ABC, parâmetros, Excel)
-├── sheets.py       ← Integração Google Sheets (ler/salvar contagens)
+├── app.py         ← Interface (Análise + Contagem)
+├── engine.py      ← Motor de cálculo
+├── storage.py     ← Persistência local (sem dependências externas)
 ├── requirements.txt
 └── README.md
 ```
-
----
-
-## ❓ Problemas comuns
-
-**"Google Sheets não configurado"**
-→ Verifique os Secrets no Streamlit Cloud — todos os campos são obrigatórios
-
-**"Erro ao conectar ao Google Sheets"**
-→ Confirme que a Service Account foi compartilhada como Editor na planilha
-
-**A aba Contagem não mostra itens**
-→ Gere a análise primeiro na aba Análise — isso sincroniza os itens com o Sheets
-
-**Contagens não atualizam para outros usuários**
-→ Clique em 🔄 Atualizar — o cache é de 30 segundos por design para não sobrecarregar a API
