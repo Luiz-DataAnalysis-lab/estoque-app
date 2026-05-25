@@ -345,109 +345,126 @@ with aba_contagem:
         if not itens_raw:
             st.info("Gere a análise na aba **Análise & Relatórios** para ver os itens.")
         else:
-            # Filtro rápido
-            filtro = st.radio(
-                "Mostrar:",
-                ["🔴 Urgentes + Excesso", "Nunca Contados", "Com Divergência", "Classe A", "Classe B", "Todos"],
-                horizontal=True, label_visibility="collapsed")
-
-            # Calcular scores e aplicar filtro
-            fila = []
+            # Separar: pendentes (não contados) e contados
+            pendentes = []
             for item in itens_raw:
                 cont_row = cont_map.get(str(item['codigo']))
-                acc_i    = calc_acuracia(item['qtdSistema'], cont_row['qtd']) \
-                           if cont_row is not None else None
-                score    = prioridade_score(item, cont_row)
+                if cont_row is not None:
+                    continue  # já contado — vai para o histórico
+                score = prioridade_score(item, cont_row)
+                pendentes.append((score, item))
+            pendentes.sort(key=lambda x: -x[0])
 
-                # Aplicar filtro
-                if filtro == "🔴 Urgentes + Excesso" and item['prioridade'] not in ('urgente','excesso'):
-                    continue
-                if filtro == "Nunca Contados" and cont_row is not None:
-                    continue
-                if filtro == "Com Divergência" and (acc_i is None or acc_i >= 0.95):
-                    continue
-                if filtro == "Classe A" and item['abc'] != 'A':
-                    continue
-                if filtro == "Classe B" and item['abc'] != 'B':
-                    continue
+            total_itens   = len(itens_raw)
+            total_contado = len(cont_map)
+            restantes     = len(pendentes)
 
-                fila.append((score, item, cont_row, acc_i))
+            # Progresso da sessão de contagem
+            pct_feito = total_contado / total_itens * 100 if total_itens > 0 else 0
+            cor_prog  = "#1A7A4A" if pct_feito >= 80 else "#B84C00" if pct_feito >= 40 else "#1A4F8A"
+            st.markdown(
+                f'<div style="display:flex;justify-content:space-between;'
+                f'align-items:center;margin-bottom:6px">'
+                f'<span style="font-weight:700;font-size:15px">📋 Fila de Contagem</span>'
+                f'<span style="color:#7A7268;font-size:13px">'
+                f'✅ {total_contado} contados · ⏳ {restantes} restantes de {total_itens}</span>'
+                f'</div>',
+                unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="prog-bg"><div class="prog-fill" '
+                f'style="width:{pct_feito:.1f}%;background:{cor_prog}"></div></div>'
+                f'<div style="font-size:11px;color:#7A7268;margin-bottom:14px">'
+                f'{pct_feito:.0f}% concluído</div>',
+                unsafe_allow_html=True)
 
-            fila.sort(key=lambda x: -x[0])
+            # Filtro rápido — só entre os pendentes
+            filtro = st.radio(
+                "Filtrar:",
+                ["Todos pendentes", "🔴 Urgentes", "⚠️ Excesso", "Classe A", "Classe B"],
+                horizontal=True, label_visibility="collapsed")
 
-            st.markdown(f"**{len(fila)} itens** — clique para registrar a contagem")
+            fila_filtrada = []
+            for score, item in pendentes:
+                if filtro == "🔴 Urgentes"  and item['prioridade'] != 'urgente':  continue
+                if filtro == "⚠️ Excesso"   and item['prioridade'] != 'excesso':  continue
+                if filtro == "Classe A"      and item['abc'] != 'A':              continue
+                if filtro == "Classe B"      and item['abc'] != 'B':              continue
+                fila_filtrada.append((score, item))
 
-            for score, item, cont_row, acc_i in fila[:60]:
-                prio = item['prioridade']
-                acc_txt = fmt_acc(acc_i) if acc_i is not None else "Não contado"
-                tag_prio = ""
-                if prio == 'urgente': tag_prio = " 🔴"
-                elif prio == 'excesso': tag_prio = " ⚠️"
+            if not fila_filtrada:
+                st.success("🎉 Nenhum item pendente neste filtro!")
+            else:
+                st.markdown(f"**{len(fila_filtrada)} itens para contar** — do mais urgente para o menos urgente")
+                st.markdown("")
 
-                with st.expander(
-                    f"[{item['abc']}]{tag_prio} {item['codigo']} · "
-                    f"{item['descricao'][:55]}... · "
-                    f"Sist: **{item['qtdSistema']:.0f}** · {acc_txt}"):
+                for score, item in fila_filtrada[:50]:
+                    prio = item['prioridade']
 
-                    cc1, cc2 = st.columns([3, 2])
-                    with cc1:
-                        st.markdown(f"**Código:** `{item['codigo']}`")
-                        st.markdown(f"**Endereço:** {item['endereco'] or '–'}")
-                        st.markdown(f"**Classe:** {item['abc']} · **Freq:** {item['frequencia']}")
-                        if prio == 'urgente':
-                            st.error("🔴 Estoque ABAIXO do ponto de pedido — comprar!")
-                        elif prio == 'excesso':
-                            st.warning("⚠️ Estoque ACIMA do máximo — investigar")
-                        if cont_row is not None:
-                            try:
-                                dt  = datetime.fromisoformat(cont_row['data'])
-                                div = cont_row['qtd'] - item['qtdSistema']
-                                st.markdown(
-                                    f"**Última contagem:** {dt.strftime('%d/%m/%Y %H:%M')} "
-                                    f"por {cont_row['usuario']} · "
-                                    f"Qtd: {cont_row['qtd']:.0f} · Div: {div:+.1f}")
-                            except: pass
-                    with cc2:
-                        st.markdown(f"**Saldo Sistema:** `{item['qtdSistema']:.1f} {item['unidade']}`")
-                        if acc_i is not None:
-                            st.markdown(f"**Acurácia anterior:** `{fmt_acc(acc_i)}`")
+                    # Badge de prioridade
+                    if prio == 'urgente':
+                        badge = "🔴 COMPRAR"
+                        card_bg = "#FFF8F8"
+                        border_cor = "#8A1A1A"
+                    elif prio == 'excesso':
+                        badge = "⚠️ EXCESSO"
+                        card_bg = "#FFFAF6"
+                        border_cor = "#B84C00"
+                    else:
+                        badge = f"Classe {item['abc']}"
+                        card_bg = "#FFFFFF"
+                        border_cor = "#1A4F8A"
 
-                    default_qty = float(cont_row['qtd']) if cont_row is not None \
-                                  else float(item['qtdSistema'])
-                    nova_qty = st.number_input(
-                        f"Quantidade Contada ({item['unidade']})",
-                        min_value=0.0, value=default_qty, step=1.0,
-                        key=f"q_{item['codigo']}")
-                    obs = st.text_input(
-                        "Observação (opcional)", key=f"o_{item['codigo']}",
-                        value=cont_row.get('observacao','') if cont_row is not None else '')
+                    with st.expander(
+                        f"{badge} · `{item['codigo']}` · "
+                        f"{item['descricao'][:50]}... · "
+                        f"Sist: **{item['qtdSistema']:.0f}** {item['unidade']}"):
 
-                    # Preview acurácia em tempo real
-                    nova_acc = calc_acuracia(item['qtdSistema'], nova_qty)
-                    div_nova = nova_qty - item['qtdSistema']
-                    cor      = acc_color(nova_acc)
-                    st.markdown(
-                        f'<div style="background:#F7F7F7;border-radius:8px;padding:10px;'
-                        f'text-align:center;margin:6px 0">'
-                        f'<span style="font-size:1.4rem;font-weight:800;color:{cor}">'
-                        f'{fmt_acc(nova_acc)}</span>'
-                        f'&nbsp;&nbsp;<span style="color:#7A7268;font-size:13px">'
-                        f'Div: {div_nova:+.1f}</span></div>',
-                        unsafe_allow_html=True)
+                        cc1, cc2 = st.columns([3, 2])
+                        with cc1:
+                            st.markdown(f"**Endereço:** `{item['endereco'] or '–'}`")
+                            st.markdown(f"**Classe:** {item['abc']} · **Freq:** {item['frequencia']} · **Custo:** R$ {item['custoUnit']:.2f}")
+                            if prio == 'urgente':
+                                st.error("🔴 Estoque abaixo do ponto de pedido — emitir compra!")
+                            elif prio == 'excesso':
+                                st.warning("⚠️ Estoque acima do máximo — verificar necessidade")
+                        with cc2:
+                            st.metric("Saldo Sistema", f"{item['qtdSistema']:.0f} {item['unidade']}")
 
-                    b1, b2 = st.columns(2)
-                    with b1:
-                        if st.button("✅ Salvar", key=f"s_{item['codigo']}",
-                                     use_container_width=True, type="primary"):
-                            if salvar_contagem(item['codigo'], float(nova_qty),
-                                               st.session_state['usuario'], obs):
-                                st.success("Salvo!"); st.rerun()
-                    with b2:
-                        if cont_row is not None:
-                            if st.button("🗑 Remover", key=f"d_{item['codigo']}",
-                                         use_container_width=True):
-                                if remover_contagem(item['codigo']):
-                                    st.success("Removido!"); st.rerun()
+                        # Input da quantidade
+                        nova_qty = st.number_input(
+                            f"✏️ Quantidade Contada ({item['unidade']})",
+                            min_value=0.0,
+                            value=float(item['qtdSistema']),
+                            step=1.0,
+                            key=f"q_{item['codigo']}")
+
+                        obs = st.text_input(
+                            "Observação (opcional)",
+                            key=f"o_{item['codigo']}", value='')
+
+                        # Preview acurácia em tempo real
+                        nova_acc = calc_acuracia(item['qtdSistema'], nova_qty)
+                        div_nova = nova_qty - item['qtdSistema']
+                        cor_acc  = acc_color(nova_acc)
+                        st.markdown(
+                            f'<div style="background:#F7F7F7;border-radius:8px;'
+                            f'padding:10px;text-align:center;margin:8px 0">'
+                            f'<span style="font-size:1.6rem;font-weight:800;color:{cor_acc}">'
+                            f'{fmt_acc(nova_acc)}</span>'
+                            f'<span style="color:#7A7268;font-size:13px;margin-left:12px">'
+                            f'Divergência: {div_nova:+.1f} {item["unidade"]}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True)
+
+                        if st.button(
+                            f"✅ Salvar e ir para o próximo",
+                            key=f"s_{item['codigo']}",
+                            use_container_width=True,
+                            type="primary"):
+                            if salvar_contagem(
+                                item['codigo'], float(nova_qty),
+                                st.session_state['usuario'], obs):
+                                st.rerun()  # item some da fila imediatamente
 
     # ── BUSCA ─────────────────────────────────────────────────────────────
     with tab_busca:
