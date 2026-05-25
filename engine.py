@@ -212,31 +212,28 @@ def calc_acuracia(sistema, contada):
 
 
 def calcular_acuracia_contagens(df_itens, contagens_df):
-    """
-    df_itens: DataFrame com colunas Produto, ABC, qtdSistema
-    contagens_df: DataFrame com colunas codigo, qtd
-    Retorna métricas de acurácia por classe e geral.
-    """
     if contagens_df is None or len(contagens_df) == 0:
         return {'geral': None, 'A': None, 'B': None, 'C': None, 'D': None,
                 'contados': 0, 'total': len(df_itens)}
 
-    merged = contagens_df.merge(
-        df_itens[['Produto','ABC','Estoque_Atual']].rename(
-            columns={'Produto':'codigo','Estoque_Atual':'qtdSistema'}),
-        on='codigo', how='left')
+    cols = df_itens.columns.tolist()
+    prod_col    = 'codigo'     if 'codigo'     in cols else 'Produto'
+    estoque_col = 'qtdSistema' if 'qtdSistema' in cols else 'Estoque_Atual'
+    itens_ref = df_itens[[prod_col, 'ABC', estoque_col]].rename(
+        columns={prod_col: 'codigo', estoque_col: 'qtdSistema'})
+    merged = contagens_df.merge(itens_ref, on='codigo', how='left')
     merged['acc'] = merged.apply(
         lambda r: calc_acuracia(r['qtdSistema'], r['qtd']), axis=1)
     merged = merged[merged['acc'].notna()]
 
     result = {
-        'geral':    merged['acc'].mean() if len(merged)>0 else None,
+        'geral':    merged['acc'].mean() if len(merged) > 0 else None,
         'contados': len(merged),
         'total':    len(df_itens),
     }
     for cls in ['A','B','C','D']:
-        sub = merged[merged['ABC']==cls]
-        result[cls] = sub['acc'].mean() if len(sub)>0 else None
+        sub = merged[merged['ABC'] == cls]
+        result[cls] = sub['acc'].mean() if len(sub) > 0 else None
     return result
 
 
