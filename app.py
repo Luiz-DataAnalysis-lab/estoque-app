@@ -258,13 +258,13 @@ with aba_contagem:
     contados = len(contagens_df)
 
     # Mapa rápido código → contagem
-    cont_map = {str(r['codigo']): r for _, r in contagens_df.iterrows()} \
+    cont_map = {str(r['codigo']): r.to_dict() for _, r in contagens_df.iterrows()} \
                if contados > 0 else {}
 
     # Acurácia geral
     if contados > 0 and total > 0:
         itens_acc = pd.DataFrame([
-            {'codigo': i['codigo'], 'ABC': i['abc'], 'Estoque_Atual': i['qtdSistema']}
+            {'codigo': i['codigo'], 'ABC': i['abc'], 'qtdSistema': i['qtdSistema']}
             for i in itens_raw])
         acc_cont = calcular_acuracia_contagens(itens_acc, contagens_df)
     else:
@@ -420,7 +420,7 @@ with aba_contagem:
                         key=f"q_{item['codigo']}")
                     obs = st.text_input(
                         "Observação (opcional)", key=f"o_{item['codigo']}",
-                        value=cont_row.get('observacao','') if cont_row else '')
+                        value=cont_row.get('observacao','') if cont_row is not None else '')
 
                     # Preview acurácia em tempo real
                     nova_acc = calc_acuracia(item['qtdSistema'], nova_qty)
@@ -463,7 +463,7 @@ with aba_contagem:
                 for item in results:
                     cont_row = cont_map.get(str(item['codigo']))
                     acc_i    = calc_acuracia(item['qtdSistema'], cont_row['qtd']) \
-                               if cont_row else None
+                               if cont_row is not None else None
                     with st.expander(
                         f"`{item['codigo']}` · {item['descricao'][:55]}... · "
                         f"Sist: {item['qtdSistema']:.0f} · {fmt_acc(acc_i)}",
@@ -478,13 +478,13 @@ with aba_contagem:
                             if acc_i is not None:
                                 st.metric("Acurácia anterior", fmt_acc(acc_i))
 
-                        default = float(cont_row['qtd']) if cont_row else float(item['qtdSistema'])
+                        default = float(cont_row['qtd']) if cont_row is not None else float(item['qtdSistema'])
                         nova = st.number_input(
                             f"Qtd. Contada ({item['unidade']})",
                             min_value=0.0, value=default, step=1.0,
                             key=f"b_{item['codigo']}")
                         obs = st.text_input("Obs.", key=f"bo_{item['codigo']}",
-                                            value=cont_row.get('observacao','') if cont_row else '')
+                                            value=cont_row.get('observacao','') if cont_row is not None else '')
 
                         nova_acc = calc_acuracia(item['qtdSistema'], nova)
                         cor = acc_color(nova_acc)
@@ -505,17 +505,16 @@ with aba_contagem:
     with tab_hist:
         if contados == 0:
             st.info("Nenhuma contagem registrada ainda.")
-        
-        if True:
+        else:
             # Enriquecer contagens com dados dos itens
             itens_idx = {i['codigo']: i for i in itens_raw}
             hist = contagens_df.copy()
             hist['descricao'] = hist['codigo'].map(
-                lambda c: itens_idx.get(c, {}).get('descricao', '')[:60])
+                lambda c: itens_idx.get(str(c), {}).get('descricao', '')[:60])
             hist['abc']       = hist['codigo'].map(
-                lambda c: itens_idx.get(c, {}).get('abc', '–'))
+                lambda c: itens_idx.get(str(c), {}).get('abc', '–'))
             hist['qtdSist']   = hist['codigo'].map(
-                lambda c: itens_idx.get(c, {}).get('qtdSistema', 0))
+                lambda c: float(itens_idx.get(str(c), {}).get('qtdSistema', 0)))
             hist['acc']       = hist.apply(
                 lambda r: calc_acuracia(r['qtdSist'], r['qtd']), axis=1)
             hist['div']       = hist['qtd'] - hist['qtdSist']
