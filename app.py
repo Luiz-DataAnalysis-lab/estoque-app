@@ -520,8 +520,20 @@ with aba_contagem:
 
     # ── HISTÓRICO ─────────────────────────────────────────────────────────
     with tab_hist:
+        # Importar — sempre visível (aberto quando não há contagens)
+        with st.expander("📥 Importar contagens de CSV", expanded=(contados == 0)):
+            st.caption("Colunas esperadas: `codigo`, `qtd`, `usuario`, `data`, `observacao`")
+            arq_imp = st.file_uploader("CSV de contagens", type=['csv'], key="imp_csv")
+            if arq_imp:
+                df_imp = pd.read_csv(arq_imp, encoding='utf-8-sig')
+                st.dataframe(df_imp.head(5), use_container_width=True, hide_index=True)
+                if st.button("⬆️ Importar", use_container_width=True, type="primary"):
+                    ok, ig = importar_contagens_csv(df_imp)
+                    st.success(f"✅ {ok} importadas · {ig} ignoradas")
+                    st.rerun()
+        st.markdown("---")
         if contados == 0:
-            st.info("Nenhuma contagem registrada ainda.")
+            st.info("Nenhuma contagem ainda. Use o importador acima.")
         else:
             # Enriquecer contagens com dados dos itens
             itens_idx = {i['codigo']: i for i in itens_raw}
@@ -580,16 +592,4 @@ with aba_contagem:
                         st.success("Contagens removidas!")
                         st.rerun()
 
-            # ── Importar histórico ─────────────────────────────────────────
-            st.markdown("---")
-            st.markdown("**📥 Importar contagens de arquivo CSV**")
-            st.caption("Formato esperado: colunas `codigo`, `qtd`, `usuario`, `data`, `observacao`")
-            arq_imp = st.file_uploader("Selecione o CSV de contagens",
-                                       type=['csv'], key="imp_csv")
-            if arq_imp:
-                df_imp = pd.read_csv(arq_imp, encoding='utf-8-sig')
-                st.dataframe(df_imp.head(5), use_container_width=True, hide_index=True)
-                if st.button("⬆️ Importar contagens", use_container_width=True, type="primary"):
-                    ok, ig = importar_contagens_csv(df_imp)
-                    st.success(f"✅ {ok} contagens importadas · {ig} ignoradas")
-                    st.rerun()
+
